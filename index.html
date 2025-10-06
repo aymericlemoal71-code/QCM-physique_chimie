@@ -1,0 +1,376 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Quiz Physique — Seconde (Final)</title>
+<style>
+  :root{
+    --bg1:#071028; --bg2:#16183a;
+    --card:#0f1724aa;
+    --accent1:#7afcff; --accent2:#ff7eb9;
+    --good:#1dd179; --bad:#ff4d4d;
+    --glass: rgba(255,255,255,0.04);
+    --glass-2: rgba(255,255,255,0.02);
+  }
+  *{box-sizing:border-box}
+  html,body{height:100%;margin:0;font-family:Inter,system-ui,Arial; background:linear-gradient(160deg,var(--bg1),var(--bg2)); color:#eef6ff; -webkit-font-smoothing:antialiased}
+  /* subtle grain */
+  body::after{content:"";position:fixed;inset:0;pointer-events:none;background-image:radial-gradient(rgba(255,255,255,0.02) 1px, transparent 1px);background-size:6px 6px;mix-blend-mode:overlay;opacity:0.15}
+
+  /* layout */
+  .wrap{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:32px;position:relative;overflow:hidden}
+  .card{width:100%;max-width:980px;background:linear-gradient(180deg,var(--card),rgba(255,255,255,0.02));border-radius:18px;padding:28px;box-shadow:0 12px 40px rgba(0,0,0,0.6);position:relative;z-index:5}
+  header{display:flex;align-items:center;gap:14px}
+  h1{margin:0;font-size:22px}
+  .subtitle{color:rgba(230,245,255,0.8);font-size:13px;margin-top:6px}
+
+  /* stars & planets (background) */
+  #bg{position:fixed;inset:0;z-index:0;pointer-events:none}
+  .star{position:absolute;background:white;border-radius:50%;opacity:0.9}
+  .planet{
+    position:absolute;border-radius:50%;transform-origin:center;
+    box-shadow:0 8px 30px rgba(0,0,0,0.6) inset;
+    opacity:0.95;
+  }
+  .planet .ring{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%) rotate(25deg);
+    border-radius:50%;border:3px solid rgba(255,255,255,0.08);mix-blend-mode:overlay}
+
+  /* panel */
+  .panel{margin-top:18px;background:transparent;padding:12px;border-radius:12px}
+  .question-wrap{background:linear-gradient(180deg,var(--glass),var(--glass-2));padding:16px;border-radius:12px;border:1px solid rgba(255,255,255,0.03);box-shadow:0 8px 30px rgba(3,6,20,0.5);overflow:hidden;position:relative}
+  .question{font-weight:700;font-size:18px;margin:0 0 10px;min-height:48px;display:flex;align-items:center}
+  .choices{display:grid;grid-template-columns:1fr 1fr;gap:12px;transition:transform .35s cubic-bezier(.2,.9,.3,1),opacity .28s ease}
+  .choice{
+    background:rgba(255,255,255,0.03);padding:12px;border-radius:10px;border:1px solid rgba(255,255,255,0.03);
+    cursor:pointer;display:flex;gap:10px;align-items:center;transition:transform .18s ease,box-shadow .18s ease,background .18s ease;
+  }
+  .choice:hover{transform:translateY(-6px);box-shadow:0 12px 30px rgba(30,50,140,0.15)}
+  .choice .label{min-width:36px;height:36px;border-radius:8px;background:linear-gradient(135deg,var(--accent1),var(--accent2));display:grid;place-items:center;color:#042033;font-weight:800}
+  .choice .text{font-size:15px}
+  .choice.selected{outline:3px solid rgba(122,250,255,0.12);box-shadow:0 16px 40px rgba(122,250,255,0.06)}
+  .choice.disabled{opacity:0.55;pointer-events:none}
+  .controls{display:flex;justify-content:space-between;align-items:center;margin-top:14px}
+  .progress{height:12px;background:rgba(255,255,255,0.02);border-radius:999px;overflow:hidden;flex:1;margin-right:14px}
+  .progress > i{display:block;height:100%;width:0;background:linear-gradient(90deg,var(--accent1),var(--accent2));transition:width .35s ease}
+  .btn{background:linear-gradient(135deg,var(--accent1),var(--accent2));border:none;padding:10px 16px;border-radius:999px;font-weight:800;color:#042033;cursor:pointer;box-shadow:0 10px 28px rgba(0,0,0,0.35)}
+  .btn[disabled]{opacity:0.45;cursor:default;box-shadow:none;transform:none}
+
+  /* transitions on question change */
+  .fade-out{opacity:0;transform:translateY(6px) scale(0.995)}
+  .fade-in{opacity:1;transform:none}
+
+  /* result */
+  .result{margin-top:18px;padding:12px}
+  .score{font-weight:900;font-size:20px;margin-bottom:8px}
+  .detail{color:rgba(220,235,255,0.9);margin-bottom:12px}
+  .correction{display:grid;gap:12px;margin-top:8px}
+  .corr-item{padding:12px;border-radius:12px;font-size:15px;line-height:1.6;display:flex;justify-content:space-between;align-items:center}
+  .corr-left{max-width:70%}
+  .corr-right{min-width:120px;text-align:right;font-weight:800}
+  .corr-good{background:rgba(29,209,121,0.08);border:2px solid rgba(29,209,121,0.18);color:var(--good)}
+  .corr-bad{background:rgba(255,77,77,0.08);border:2px solid rgba(255,77,77,0.18);color:var(--bad)}
+  .joke{margin-top:6px;font-weight:700;color:#ffd8d8}
+
+  /* responsive */
+  @media(max-width:760px){
+    .choices{grid-template-columns:1fr;gap:10px}
+    .corr-left{max-width:60%}
+    .corr-right{min-width:100px}
+  }
+</style>
+</head>
+<body>
+  <!-- background -->
+  <div id="bg"></div>
+
+  <div class="wrap">
+    <main class="card" role="main" aria-labelledby="title">
+      <header>
+        <svg width="38" height="38" viewBox="0 0 24 24" fill="none" aria-hidden>
+          <circle cx="12" cy="12" r="9" stroke="url(#g)" stroke-width="1.4" />
+          <defs><linearGradient id="g" x1="0" x2="1"><stop offset="0" stop-color="#7afcff"/><stop offset="1" stop-color="#ff7eb9"/></linearGradient></defs>
+        </svg>
+        <div>
+          <h1 id="title">Quiz Physique — Seconde</h1>
+          <div class="subtitle">10 questions — hors-ligne — correction détaillée à la fin</div>
+        </div>
+      </header>
+
+      <section class="panel">
+        <div class="question-wrap" id="app">
+          <!-- intro -->
+          <div id="intro">
+            <p style="margin:0 0 8px">Cliquer sur <strong>Commencer</strong> pour démarrer. Impossible de revenir en arrière pendant le quiz.</p>
+            <div style="text-align:center;margin-top:12px">
+              <button id="startBtn" class="btn" aria-label="Commencer le quiz">Commencer</button>
+            </div>
+          </div>
+
+          <!-- quiz -->
+          <div id="quiz" style="display:none">
+            <div style="display:flex;gap:12px;align-items:center;margin-bottom:10px">
+              <div class="progress" aria-hidden><i id="progBar"></i></div>
+              <div id="qinfo" style="min-width:120px;text-align:right;font-weight:800;color:rgba(230,245,255,0.9)"></div>
+            </div>
+
+            <div id="questionBlock">
+              <div class="question" id="questionText" aria-live="polite"></div>
+              <div class="choices" id="choices"></div>
+            </div>
+
+            <div class="controls">
+              <div style="color:rgba(210,230,255,0.85)"><small>Choisis une réponse puis <strong>Suivant</strong></small></div>
+              <div>
+                <button id="nextBtn" class="btn" disabled>Suivant ▸</button>
+              </div>
+            </div>
+          </div>
+
+          <!-- result -->
+          <div id="result" style="display:none" class="result" aria-live="polite">
+            <div class="score" id="scoreText"></div>
+            <div class="detail" id="detailText"></div>
+            <div id="joke" class="joke" aria-hidden></div>
+            <div id="correction" class="correction" role="list"></div>
+            <div style="text-align:center;margin-top:14px"><button id="retryBtn" class="btn">🔄 Recommencer</button></div>
+          </div>
+        </div>
+      </section>
+    </main>
+  </div>
+
+<script>
+/* ---------------------------
+   Background: stars + planets
+   --------------------------- */
+const bg = document.getElementById('bg');
+const W = window.innerWidth, H = window.innerHeight;
+
+// create stars
+for(let i=0;i<120;i++){
+  const s = document.createElement('div');
+  s.className='star';
+  const size = Math.random()*2 + 0.6;
+  s.style.width = s.style.height = size + 'px';
+  s.style.left = (Math.random()*100) + '%';
+  s.style.top = (Math.random()*100) + '%';
+  s.style.opacity = Math.random()*0.9;
+  bg.appendChild(s);
+}
+// helper to create planet with ring (optional)
+function makePlanet(opts){
+  const p = document.createElement('div');
+  p.className='planet';
+  p.style.width = p.style.height = (opts.size)+'px';
+  p.style.left = opts.left + '%';
+  p.style.top = opts.top + '%';
+  p.style.background = opts.background;
+  if(opts.rotate) p.style.animationDuration = opts.rotate;
+  if(opts.ring){
+    const r = document.createElement('div'); r.className='ring';
+    r.style.width = (opts.size * 1.8) + 'px';
+    r.style.height = (opts.size * 0.6) + 'px';
+    r.style.borderColor = opts.ringColor || 'rgba(255,255,255,0.08)';
+    p.appendChild(r);
+  }
+  bg.appendChild(p);
+}
+makePlanet({size:78,left:8,top:18,background:'radial-gradient(circle at 30% 30%, #ffb470,#d65d00)',ring:true,rotate:'28s'});
+makePlanet({size:50,left:76,top:14,background:'radial-gradient(circle at 40% 40%, #6fb2ff,#003366)',rotate:'36s'});
+makePlanet({size:62,left:84,top:60,background:'radial-gradient(circle at 40% 40%, #b47aff,#3a0066)',ring:true,rotate:'24s'});
+makePlanet({size:44,left:20,top:72,background:'radial-gradient(circle at 40% 10%, #66ffa3,#006b3d)',rotate:'40s'});
+
+/* ---------------------------
+   Quiz data & behaviour
+   --------------------------- */
+const originalQuestions = [
+  {q:"Quelle est l'unité SI de la force ?", choices:["Joule","Newton","Watt","Pascal"], a:1},
+  {q:"Un objet parcourt 90 km en 1,5 h. Sa vitesse moyenne est :", choices:["60 km/h","45 km/h","75 km/h","90 km/h"], a:2},
+  {q:"Quelle grandeur mesure l'intensité d'un courant électrique ?", choices:["Volt","Ampère","Ohm","Watt"], a:1},
+  {q:"Énergie cinétique transformée quand on lance une balle vers le haut :", choices:["Énergie thermique","Énergie potentielle gravitationnelle","Énergie chimique","Énergie nucléaire"], a:1},
+  {q:"Formule de la densité ρ (masse m, volume V) :", choices:["ρ = m / V","ρ = V / m","ρ = m × V","ρ = m + V"], a:0},
+  {q:"Dans un circuit en série, l'intensité du courant est :", choices:["la même","plus grande dans la lampe","dépend seulement de la résistance","nulle"], a:0},
+  {q:"Un solide flotte si :", choices:["sa densité > celle du liquide","sa masse > celle du liquide","sa densité < celle du liquide","son volume est inférieur"], a:2},
+  {q:"Quelle est l'unité de la pression en SI ?", choices:["Pascal","Newton","Joule","Bar"], a:0},
+  {q:"La vitesse de la lumière dans le vide est environ :", choices:["3 × 10^3 m/s","3 × 10^5 m/s","3 × 10^8 m/s","3 × 10^10 m/s"], a:2},
+  {q:"Quel instrument mesure l'intensité d'un courant ?", choices:["Voltmètre","Ampèremètre","Ohmmètre","Baromètre"], a:1}
+];
+
+// multiple jokes for randomness
+const jokes = [
+  "Pourquoi les atomes détestent-ils les blagues ? Parce qu'ils font tout exploser ! 💥",
+  "Pourquoi l'électron n'a-t-il jamais de clés ? Parce qu'il est toujours négatif ! ⚡",
+  "Que dit un photon en arrivant au travail ? Je suis sans masse, mais j'ai du boulot. 🌟",
+  "Pourquoi la physique aime les fêtes ? Parce qu'elle adore les ondes ! 🎉",
+  "Comment appelle-t-on un chat qui étudie la physique ? Un physicat ! 🐱",
+  "Pourquoi le mathématicien n'a-t-il pas peur du vide ? Parce qu'il l'étudie avec une intégrale ! ➗",
+  "Pourquoi les particules aiment les blagues courtes ? Parce qu'elles ont une petite longueur d'onde ! 🌈",
+  "Que fait un photon quand il est en vacances ? Il prend la lumière ! ☀️",
+  "Pourquoi la gravité est-elle toujours fâchée ? Parce qu'elle ne laisse jamais partir les choses ! 🪐",
+  "Pourquoi l'ampoule est allée à l'école ? Pour devenir éclairée ! 💡"
+];
+
+// state
+let questions = [];
+let current = 0;
+let answers = [];
+let score = 0;
+
+// elements
+const startBtn = document.getElementById('startBtn');
+const intro = document.getElementById('intro');
+const quiz = document.getElementById('quiz');
+const questionText = document.getElementById('questionText');
+const choicesBox = document.getElementById('choices');
+const nextBtn = document.getElementById('nextBtn');
+const progBar = document.getElementById('progBar');
+const qinfo = document.getElementById('qinfo');
+const result = document.getElementById('result');
+const scoreText = document.getElementById('scoreText');
+const detailText = document.getElementById('detailText');
+const correction = document.getElementById('correction');
+const jokeBox = document.getElementById('joke');
+const retryBtn = document.getElementById('retryBtn');
+
+// prevent accidental back navigation during quiz
+window.addEventListener('load', ()=>{
+  history.replaceState({page:'start'}, '', '');
+  history.pushState({page:'block'}, '', '');
+  window.addEventListener('popstate', function(){ if(quiz.style.display !== 'none' && result.style.display === 'none'){ history.pushState({page:'block'}, '', ''); }});
+  window.addEventListener('beforeunload', function(e){ if(quiz.style.display !== 'none' && result.style.display === 'none'){ e.preventDefault(); e.returnValue=''; return ''; }});
+});
+
+// utility: shuffle
+function shuffleArray(arr){ const a = arr.slice(); for(let i=a.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [a[i],a[j]]=[a[j],a[i]] } return a; }
+
+// start
+startBtn.addEventListener('click', ()=>{
+  questions = shuffleArray(originalQuestions);
+  current = 0; answers = []; score = 0;
+  intro.style.display = 'none';
+  result.style.display = 'none';
+  quiz.style.display = 'block';
+  updateProgress();
+  renderQuestion(true);
+});
+
+// render question with smooth transitions
+function renderQuestion(withFade){
+  const q = questions[current];
+  qinfo.textContent = `Question ${current+1} / ${questions.length}`;
+  if(withFade){
+    // fade out
+    const qb = document.getElementById('questionBlock');
+    qb.classList.add('fade-out');
+    setTimeout(()=>{ loadQuestion(q); qb.classList.remove('fade-out'); qb.classList.add('fade-in'); setTimeout(()=>qb.classList.remove('fade-in'), 350); }, 260);
+  } else {
+    loadQuestion(q);
+  }
+}
+
+function loadQuestion(q){
+  questionText.textContent = q.q;
+  // build choices
+  choicesBox.innerHTML = '';
+  q.choices.forEach((text, i)=>{
+    const div = document.createElement('div');
+    div.className = 'choice';
+    div.setAttribute('role','button');
+    div.tabIndex = 0;
+    div.innerHTML = `<div class="label">${String.fromCharCode(65+i)}</div><div class="text">${text}</div>`;
+    div.addEventListener('click', ()=> selectChoice(i, div));
+    div.addEventListener('keydown', (e)=>{ if(e.key === 'Enter' || e.key === ' ') selectChoice(i, div); });
+    choicesBox.appendChild(div);
+  });
+  // reset next button
+  nextBtn.disabled = true;
+  updateProgress();
+}
+
+function selectChoice(index, elem){
+  Array.from(choicesBox.children).forEach(ch => { ch.classList.remove('selected'); ch.classList.remove('disabled'); });
+  elem.classList.add('selected');
+  // mark others disabled visually
+  Array.from(choicesBox.children).forEach(ch=>{ if(!ch.classList.contains('selected')) ch.classList.add('disabled'); });
+  answers[current] = index;
+  nextBtn.disabled = false;
+}
+
+nextBtn.addEventListener('click', ()=>{
+  // guard
+  if(typeof answers[current] === 'undefined') return;
+  if(answers[current] === questions[current].a) score++;
+  current++;
+  if(current >= questions.length) finishQuiz();
+  else renderQuestion(true);
+});
+
+function updateProgress(){
+  const pct = Math.round((current / questions.length) * 100);
+  progBar.style.width = pct + '%';
+  qinfo.textContent = `Question ${Math.min(current+1, questions.length)} / ${questions.length}`;
+}
+
+// finish
+function finishQuiz(){
+  quiz.style.display = 'none';
+  result.style.display = 'block';
+  // score + feedback
+  scoreText.textContent = `Votre note : ${score} / ${questions.length}`;
+  let percent = Math.round((score / questions.length) * 100);
+  let feedback = '';
+  if(percent === 100) feedback = '🌟 Excellent — parfait !';
+  else if(percent >= 80) feedback = '👏 Très bien — bon travail !';
+  else if(percent >= 50) feedback = '🙂 Pas mal — révise encore un peu.';
+  else feedback = '😕 Il faut revoir les notions de base.';
+  detailText.textContent = feedback + ` (${percent}%)`;
+  // jokes if <5
+  if(score < 5){
+    const j = jokes[Math.floor(Math.random()*jokes.length)];
+    jokeBox.textContent = j;
+  } else jokeBox.textContent = '';
+
+  // correction (spaced + colored)
+  correction.innerHTML = '';
+  // summary per theme could be added; here show each item clearly
+  questions.forEach((q, i)=>{
+    const ok = answers[i] === q.a;
+    const item = document.createElement('div');
+    item.className = 'corr-item ' + (ok ? 'corr-good' : 'corr-bad');
+    // left side: question & text
+    const left = document.createElement('div');
+    left.className = 'corr-left';
+    left.innerHTML = `<strong>Q${i+1}.</strong> ${q.q}<br><small style="opacity:0.85">Votre réponse : <strong>${answers[i]!==undefined? q.choices[answers[i]] : 'Aucune'}</strong></small>`;
+    // right side: result + good answer
+    const right = document.createElement('div');
+    right.className = 'corr-right';
+    right.innerHTML = `${ok ? '✅ Correct' : '❌ Faux'}<br><small style="display:block;margin-top:6px;color:rgba(255,255,255,0.9)">Bonne réponse : <strong>${q.choices[q.a]}</strong></small>`;
+    item.appendChild(left); item.appendChild(right);
+    correction.appendChild(item);
+  });
+}
+
+// restart: shuffle and new run
+retryBtn.addEventListener('click', ()=>{
+  questions = shuffleArray(originalQuestions);
+  current = 0; answers = []; score = 0;
+  result.style.display = 'none';
+  intro.style.display = 'none';
+  quiz.style.display = 'block';
+  updateProgress();
+  renderQuestion(true);
+});
+
+// initialize with intro visible
+(function init(){
+  // ensure start button focusable and active
+  startBtn.disabled = false;
+  // prepare a safe initial shuffle so each new start is different
+  questions = shuffleArray(originalQuestions);
+  // make progress zero
+  progBar.style.width = '0%';
+})();
+</script>
+</body>
+</html>
